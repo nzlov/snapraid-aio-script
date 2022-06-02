@@ -754,11 +754,45 @@ function send_mail(){
   #    maintained.
   # 4. The HTML code blocks need to be modified to use <pre></pre> to display
   #    correctly.
-  $MAIL_BIN -a 'Content-Type: text/html' -s "$SUBJECT" "$EMAIL_ADDRESS" \
-    < <(echo "$body" | sed '/^[[:space:]]*$/d; /^ -*$/d; s/$/  /' |
-      python -m markdown |
+
+  body=$(echo "$body" | sed '/^[[:space:]]*$/d; /^ -*$/d; s/$/  /' |
+      python3 -m markdown |
       sed 's/<code>/<pre>/;s%</code>%</pre>%')
+
+  if [ -x "$HOOK_NOTIFICATION" ]; then
+    echo -e "Notification user script is set. Calling it now [$(date)]"
+    $HOOK_NOTIFICATION "$SUBJECT" "$body"
+  else
+    echo -e "Email address is set. Sending email report to **$EMAIL_ADDRESS** [$(date)]"
+    (
+    	echo -e "To: $EMAIL_ADDRESS"
+	echo -e "Subject: $SUBJECT"
+	echo "Content-Type: text/html; charset=UTF-8"
+	echo 
+	echo -e "$body"
+	echo
+    ) | $MAIL_BIN -t
+    #$MAIL_BIN -s "$SUBJECT\nContent-Type: text/html" -r "$FROM_EMAIL_ADDRESS" "$EMAIL_ADDRESS" \
+    #  < <(echo "$body")
+  fi
 }
+## Process and mail the email body read from stdin.
+#function send_mail(){
+#  local body; body=$(cat)
+#  # Send the raw $body and append the HTML.
+#  # Try to workaround py markdown 2.6.8 issues:
+#  # 1. Will not format code blocks with empty lines, so just remove
+#  #    them.
+#  # 2. A dash line inside of code block brekas it, so remove it.
+#  # 3. Add trailing double-spaces ensures the line endings are
+#  #    maintained.
+#  # 4. The HTML code blocks need to be modified to use <pre></pre> to display
+#  #    correctly.
+#  $MAIL_BIN -s "$SUBJECT" "$EMAIL_ADDRESS" \
+#    < <(echo "$body" | sed '/^[[:space:]]*$/d; /^ -*$/d; s/$/  /' |
+#      python -m markdown |
+#      sed 's/<code>/<pre>/;s%</code>%</pre>%')
+#}
 
 # Due to how process substitution and newer bash versions work, this function
 # stops the output stream which allows wait stops wait from hanging on the tee
